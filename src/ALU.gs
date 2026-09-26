@@ -12,14 +12,20 @@
  * @return {number} Resultado de 8 bits (0 a 255)
  */
 function ejecutarALU(operacion, a, b) {
+  // Validación de seguridad por si el parámetro operacion llega vacío
+  if (operacion === undefined || operacion === null) {
+    throw new Error("Error: La operación de la ALU no fue especificada (es undefined o null).");
+  }
+
   let resultado = 0;
   let carryTemp = 0;
   
   // Asegurar que los operandos estén dentro del rango de 8 bits
-  a = a & 0xFF;
+  a = a !== undefined ? a & 0xFF : 0;
   b = b !== undefined ? b & 0xFF : 0;
   
-  switch (operacion.toUpperCase()) {
+  // Convertir a string de forma segura antes de usar toUpperCase
+  switch (String(operacion).toUpperCase()) {
     case "ADD":
       let suma = a + b;
       resultado = suma & 0xFF;
@@ -79,8 +85,7 @@ function ejecutarALU(operacion, a, b) {
   // 2. Carry Flag (CF): Se activa (1) si ocurrió un desbordamiento o acarreo sin signo[cite: 1]
   flags.CF = carryTemp;
   
-  // 3. Sign Flag (SF): Refleja el bit más significativo (MSB) del resultado (1 si es negativo en complemento a 2)[cite: 1]
-  // En 8 bits, el bit más significativo es el bit 7 (valor 128).
+  // 3. Sign Flag (SF): Refleja el bit más significativo (MSB) del resultado[cite: 1]
   flags.SF = ((resultado & 0x80) !== 0) ? 1 : 0;
   
   // Reflejar cambios de banderas inmediatamente en la interfaz gráfica
