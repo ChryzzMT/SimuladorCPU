@@ -1,64 +1,97 @@
-// ==========================================
-// BANCO DE REGISTROS Y BANDERAS DEL CPU (8 BITS)
-// ==========================================
+let registers = { PC: 0, AX: 0, BX: 0, MAR: 0, MDR: 0, IR: 0 };
+let flags = { ZF: 0, CF: 0, SF: 0 };
 
-// Objeto global para almacenar los registros de propósito general y control (8 bits)
-let registers = {
-  PC: 0,  // Program Counter (Puntero de instrucción)
-  AX: 0,  // Acumulador de propósito general[cite: 1]
-  BX: 0,  // Registro auxiliar de propósito general[cite: 1]
-  MAR: 0, // Memory Address Register (Registro de dirección de memoria)[cite: 1]
-  MDR: 0, // Memory Buffer/Data Register (Registro de datos de memoria)[cite: 1]
-  IR: 0   // Instruction Register (Registro de instrucción)[cite: 1]
-};
 
-// Objeto global para las banderas de estado (1 bit)[cite: 1]
-let flags = {
-  ZF: 0, // Zero Flag: Se activa (1) si el resultado es cero[cite: 1]
-  CF: 0, // Carry Flag: Se activa (1) si hay desbordamiento o acarreo[cite: 1]
-  SF: 0  // Sign Flag: Refleja el bit más significativo (MSB)[cite: 1]
-};
+// Control interno del ciclo (se persiste entre clics)
+let ctl = { halt: false, parar: false, paso: 0, fase: 0, logRow: 0, ops: [], pend: null };
 
-/**
- * Actualiza los valores de los registros y banderas en la interfaz visual 
- * del panel izquierdo de Google Sheets según las coordenadas:
- * - Registros en D8:D13
- * - Banderas en H21, H23, H25
- */
+
+const CLAVE_ESTADO = "CPU_STATE";
+const CLAVE_PAUSA = "CPU_PAUSA";
+
+
+function reiniciarControl() {
+  ctl.halt = false;
+  ctl.parar = false;
+  ctl.paso = 0;
+  ctl.fase = 0;
+  ctl.logRow = LOG_CONFIG.filaInicio;
+  ctl.ops = [];
+  ctl.pend = null;
+}
+
+
+function guardarEstadoCPU() {
+  PropertiesService.getScriptProperties().setProperty(
+    CLAVE_ESTADO,
+    JSON.stringify({ r: registers, f: flags, c: ctl })
+  );
+}
+
+
+function cargarEstadoCPU() {
+  var raw = PropertiesService.getScriptProperties().getProperty(CLAVE_ESTADO);
+  if (raw) {
+    var s = JSON.parse(raw);
+    Object.assign(registers, s.r);
+    Object.assign(flags, s.f);
+    Object.assign(ctl, s.c);
+  } else {
+    reiniciarControl();
+  }
+}
+
+
+function setPausa(valor) {
+  PropertiesService.getScriptProperties().setProperty(CLAVE_PAUSA, valor ? "1" : "0");
+}
+
+
+function estaPausado() {
+  return PropertiesService.getScriptProperties().getProperty(CLAVE_PAUSA) === "1";
+}
+
+
 function actualizarRegistrosUI() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  
-  // Mapeo de Registros en la columna D (filas 8 a 13)
-  sheet.getRange("D8").setValue(registers.PC);   // PC  -> Fila 8
-  sheet.getRange("D9").setValue(registers.AX);   // AX  -> Fila 9
-  sheet.getRange("D10").setValue(registers.BX);  // BX  -> Fila 10
-  sheet.getRange("D11").setValue(registers.MAR); // MAR -> Fila 11
-  sheet.getRange("D12").setValue(registers.MDR); // MDR -> Fila 12
-  sheet.getRange("D13").setValue(registers.IR);  // IR  -> Fila 13
-  
-  // Actualización de las Banderas de Estado (ZF, CF, SF) en celdas específicas
-  sheet.getRange("H21").setValue(flags.ZF);      // Zero Flag  -> Celda H21
-  sheet.getRange("H23").setValue(flags.CF);      // Carry Flag -> Celda H23
-  sheet.getRange("H25").setValue(flags.SF);      // Sign Flag  -> Celda H25
+  var sh = obtenerHojaSimulador();
+  var claves = ["PC", "AX", "BX", "MAR", "MDR", "IR"];
+  var dec = [], txt = [];
+
+
+  claves.forEach(function (k) {
+    var v = registers[k] & 0xFF;
+    dec.push([v]);
+    txt.push([numeroHex(v), binario8(v)]);
+  });
+
+
+  sh.getRange("D8:D13").setValues(dec);
+  var rango = sh.getRange("E8:F13");
+  rango.setNumberFormat("@");      // texto: evita perder ceros del binario
+  rango.setValues(txt);
+
+
+  sh.getRange(CPU_CONFIG.flags.ZF).setValue(flags.ZF);
+  sh.getRange(CPU_CONFIG.flags.CF).setValue(flags.CF);
+  sh.getRange(CPU_CONFIG.flags.SF).setValue(flags.SF);
 }
 
-/**
- * Restaura todos los registros y banderas del CPU a cero (Operación de RESET)[cite: 1].
- */
+
+// RESET: registros y PC a cero (la RAM se conserva)
 function resetCPU() {
-  registers.PC = 0;
-  registers.IR = 0;
-  registers.MAR = 0;
-  registers.MDR = 0;
-  registers.AX = 0;
-  registers.BX = 0;
-  
-  flags.ZF = 0;
-  flags.CF = 0;
-  flags.SF = 0;
-  
-  // Reflejar el reseteo en la interfaz visual de la hoja
+  registers.PC = 0; registers.AX = 0; registers.BX = 0;
+  registers.MAR = 0; registers.MDR = 0; registers.IR = 0;
+  flags.ZF = 0; flags.CF = 0; flags.SF = 0;
+  reiniciarControl();
   actualizarRegistrosUI();
-  
-  Logger.log("CPU reiniciado: Registros (D8:D13) y Banderas (H21, H23, H25) en 0.");
 }
+
+
+function obtenerEstadoRegistros() {
+  return "PC=" + registers.PC + " AX=" + registers.AX + " BX=" + registers.BX +
+         " MAR=" + registers.MAR + " MDR=" + registers.MDR + " IR=" + registers.IR +
+         " ZF=" + flags.ZF + " CF=" + flags.CF + " SF=" + flags.SF;
+}
+
+
+
