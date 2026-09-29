@@ -1,4 +1,19 @@
 const MAX_FASES_RUN = 4000;
+
+function limpiarLog() {
+  var sh = obtenerHojaSimulador();
+  var ult = sh.getLastRow();
+  if (ult < LOG_CONFIG.filaInicio) return;
+  var n = ult - LOG_CONFIG.filaInicio + 1;
+  [LOG_CONFIG.paso, LOG_CONFIG.fase, LOG_CONFIG.detalle, LOG_CONFIG.micro, LOG_CONFIG.estado]
+    .forEach(function (c) { sh.getRange(LOG_CONFIG.filaInicio, c, n, 1).clearContent(); });
+}
+
+function limpiarALU() {
+  var sh = obtenerHojaSimulador();
+  [ALU_CONFIG.operando1, ALU_CONFIG.operando2, ALU_CONFIG.operacion, ALU_CONFIG.resultado]
+    .forEach(function (a) { sh.getRange(a).clearContent(); });
+}
 function btnLoadProgram() {
   try {
     var r = ensamblarPrograma();
@@ -16,7 +31,6 @@ function btnLoadProgram() {
   }
 }
 
-
 function btnStep() {
   try {
     cargarEstadoCPU();
@@ -28,13 +42,11 @@ function btnStep() {
   }
 }
 
-
 function btnRun() {
   try {
     cargarEstadoCPU();
     if (ctl.halt) { aviso("CPU detenida (HLT). Usa LOAD PROGRAM.", "HALT"); return; }
     setPausa(false);
-
 
     var t0 = Date.now(), n = 0;
     // Apps Script corta a los 6 min: paramos a los 5 y se continúa con RUN
@@ -42,7 +54,6 @@ function btnRun() {
       avanzarFase();
       n++;
     }
-
 
     if (ctl.halt) aviso("Programa terminado (HLT). Pasos: " + ctl.paso, "RUN");
     else if (estaPausado()) aviso("Pausado. Continúa con RUN o STEP.", "PAUSE");
@@ -57,7 +68,6 @@ function btnPause() {
   aviso("Pausa solicitada.", "PAUSE");
 }
 
-
 function btnReset() {
   try {
     setPausa(true);
@@ -70,22 +80,3 @@ function btnReset() {
     avisoError(e.message, "RESET - ERROR");
   }
 }
-
-
-function limpiarLog() {
-  var sh = obtenerHojaSimulador();
-  var ult = sh.getLastRow();
-  if (ult < LOG_CONFIG.filaInicio) return;
-  var n = ult - LOG_CONFIG.filaInicio + 1;
-  [LOG_CONFIG.paso, LOG_CONFIG.fase, LOG_CONFIG.detalle, LOG_CONFIG.micro, LOG_CONFIG.estado]
-    .forEach(function (c) { sh.getRange(LOG_CONFIG.filaInicio, c, n, 1).clearContent(); });
-}
-
-
-function limpiarALU() {
-  var sh = obtenerHojaSimulador();
-  [ALU_CONFIG.operando1, ALU_CONFIG.operando2, ALU_CONFIG.operacion, ALU_CONFIG.resultado]
-    .forEach(function (a) { sh.getRange(a).clearContent(); });
-}
-
-
